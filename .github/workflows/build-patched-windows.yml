@@ -1,0 +1,59 @@
+
+name: Build patched Windows iperf3
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Download build scripts
+        uses: actions/checkout@v4
+
+      - name: Install Cygwin build environment
+        shell: pwsh
+        run: |
+          cmd /c ci-cygwin-installer.cmd
+          if ($LASTEXITCODE -ne 0) {
+            throw "Cygwin installation failed"
+          }
+
+      - name: Build patched iperf3
+        shell: pwsh
+        run: |
+          $bash = Join-Path $env:GITHUB_WORKSPACE "cygwin\bin\bash.exe"
+          if (!(Test-Path $bash)) {
+            throw "Cygwin bash.exe not found"
+          }
+
+          & $bash -lc 'cd "$(cygpath -u "$GITHUB_WORKSPACE")" && ./ci-windows-cygwin-build.sh no "$(cygpath -u "$GITHUB_WORKSPACE")/cygwin" https://github.com/davidBar-On/iperf.git issues-472-1161-cygwin-parallel-udp-stearms only_iperf3'
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "iperf3 build failed"
+          }
+
+      - name: Check executable
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE "iperf3\bin\iperf3.exe"
+          if (!(Test-Path $exe)) {
+            throw "iperf3.exe was not generated"
+          }
+          & $exe --version
+          if ($LASTEXITCODE -ne 0) {
+            throw "iperf3 version check failed"
+          }
+
+      - name: Package Windows binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: iperf3-windows-cygwin-patched
+          path: |
+            iperf3/bin/iperf3.exe
+            iperf3/bin/cygwin1.dll
+          if-no-files-found: error
