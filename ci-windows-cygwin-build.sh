@@ -80,6 +80,12 @@ if [[ ${only_apps} == "only_iperf3" ]]; then
 	git clone --no-tags --single-branch --branch "${source_branch}" --shallow-submodules --recurse-submodules -j"$(nproc)" --depth 1 "${source_repo}" "$HOME/iperf3_build"
 	cd "$HOME/iperf3_build" || exit 1
 
+	echo "=== Exact source commit ==="
+	git rev-parse HEAD
+	echo "=== UDP parallel stream patch markers ==="
+	git log -1 --format="%H %s"
+	git grep -n -E 'CREATE_STREAMS|num.*ports|port.*range' -- src
+
 	printf '%b\n\n' " \e[94m\U25cf\e[0m Repo Info"
 
 	git remote show origin
