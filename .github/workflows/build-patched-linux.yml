@@ -1,0 +1,65 @@
+
+name: Build patched Linux iperf3
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            git
+
+      - name: Checkout patched source
+        run: |
+          git clone \
+            --single-branch \
+            --branch issues-472-1161-cygwin-parallel-udp-stearms \
+            https://github.com/davidBar-On/iperf.git iperf3-src
+
+          cd iperf3-src
+
+          echo "=== Exact source commit ==="
+          git rev-parse HEAD
+          git log -1 --format="%H %s"
+
+      - name: Build iperf3
+        run: |
+          cd iperf3-src
+
+          ./bootstrap.sh
+
+          ./configure \
+            --enable-static-bin \
+            --disable-shared \
+            --without-openssl \
+            --prefix="$GITHUB_WORKSPACE/output"
+
+          make -j"$(nproc)"
+          make install
+
+      - name: Verify executable
+        run: |
+          ./output/bin/iperf3 --version
+          file ./output/bin/iperf3
+          ldd ./output/bin/iperf3 || true
+
+      - name: Package Linux binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: iperf3-linux-patched
+          path: output/bin/iperf3
+          if-no-files-found: error
